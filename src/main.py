@@ -10,9 +10,16 @@ __version__ = 0.1
 
 import argparse
 
-from sys import exit
+from pathlib import Path
+from sys import exit, stderr
 
 from PIL import Image
+
+
+def printerr(err_msg: str, exit_code: int) -> None:
+    print(err_msg, file=stderr)
+    if exit_code > 0:
+        exit(exit_code)
 
 
 def main(
@@ -21,7 +28,24 @@ def main(
     position: str,
     alpha: float,
 ) -> int:
-    print(watermark, files, position, alpha)
+
+    if not watermark.lower().endswith(".svg"):
+        printerr(f"File {watermark} not an SVG file.", 1)
+    
+    usable = []
+    for file in files:
+        extension = file.lower().split('.')[-1]
+        if extension not in ["jpeg", "jpg", "png"]:
+            printerr(f"Skipping {file} due to unknown extension {extension}.", 0)
+        else:
+            path = Path(file)
+            if not path.exists():
+                printerr(f"Nonexistent file {path.name}. Skipping", 0)
+            else:
+                usable.append(path)
+
+    print(usable)
+
     return 0
 
 
