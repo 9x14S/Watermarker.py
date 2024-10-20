@@ -13,10 +13,11 @@ import argparse
 from pathlib import Path
 from shutil import copy
 from sys import exit, stderr
+from os import unlink
 from io import BytesIO
 
 from cairosvg import svg2png
-from PIL import Image
+from PIL import Image, ImageFile
 
 
 def printerr(err_msg: str, exit_code: int) -> None:
@@ -42,6 +43,28 @@ def backup(files: list[Path]) -> None:
             printerr(str(e), 0)
             printerr(f"File {file} could not be backed. Exiting.", 3)
     return
+
+
+def add_watermark_save(
+    watermark: Image.Image,
+    files: list[Path],
+    position: str,
+    alpha: float,
+) -> None:
+    """Opens the images in RGBA mode, adjusts the watermark, adds them together
+    and then saves it back as the original file."""
+    for file in files:
+        image  = Image.open(file).convert("RGBA")
+        watermark_buffer = Image.new("RGBA", image.size)
+        image_buffer     = Image.new("RGBA", image.size)
+
+        watermark_buffer.paste(watermark, (0, 0))
+
+        image_buffer = Image.alpha_composite(image_buffer, image)
+        image_buffer = Image.alpha_composite(image_buffer, watermark_buffer)
+        image_buffer.save(file.with_suffix(".png"), format="png")
+        if file.suffix.lower() in [".jpg", ".jpeg"]:
+            unlink(file)
 
 
 def main(
@@ -80,7 +103,7 @@ def main(
     # Load SVG
     svg2png_buffer = BytesIO()
     svg2png(url=str(watermark_path), write_to=svg2png_buffer)
-    png_watermark = Image.open(fp=svg2png_buffer)
+    png_watermark = Image.open(fp=svg2png_buffer).convert("RGBA")
     
     # Check for valid files
     usable: list[Path] = []
@@ -96,6 +119,7 @@ def main(
                 usable.append(path)
 
     backup(usable)
+    add_watermark_save(png_watermark, usable, position, alpha)
 
     return 0
 
@@ -116,7 +140,7 @@ if __name__ == "__main__":
         choices=["topleft", "topright", "bottomleft", "bottomright", "center"],
         help="position"
     )
-    parser.add_argument("-a", "--alpha", default=100.0, type=float, help="transparency value")
+    parser.add_argument("-a", "--alpha", default=1.0, type=float, help="transparency value")
     args = parser.parse_args()
 
     printerr("Finalized execution", main(args.watermark, args.files, args.position, args.alpha))
