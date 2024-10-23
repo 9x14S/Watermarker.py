@@ -17,7 +17,25 @@ from os import unlink
 from io import BytesIO
 
 from cairosvg import svg2png
-from PIL import Image, ImageFile
+from PIL import Image
+
+
+def get_position(
+        position: str,
+        image_size: tuple[int, int],
+        watermark_size: tuple[int, int]
+) -> tuple[int, int]:
+    match position:
+        case "topleft":
+            return (0, 0)
+        case "topright":
+            return (image_size[0] - watermark_size[0], 0)
+        case "bottomleft":
+            return (0, image_size[1] - watermark_size[1])
+        case "bottomright":
+            return (image_size[0] - watermark_size[0], image_size[1] - watermark_size[1])
+        case _:
+            raise ValueError(f"Unknown position {position}.")
 
 
 def printerr(err_msg: str, exit_code: int) -> None:
@@ -58,7 +76,7 @@ def add_watermark_save(
         watermark_buffer = Image.new("RGBA", image.size)
         image_buffer     = Image.new("RGBA", image.size)
 
-        watermark_buffer.paste(watermark, (0, 0))
+        watermark_buffer.paste(watermark, get_position(position, image.size, watermark.size))
 
         image_buffer = Image.alpha_composite(image_buffer, image)
         image_buffer = Image.alpha_composite(image_buffer, watermark_buffer)
